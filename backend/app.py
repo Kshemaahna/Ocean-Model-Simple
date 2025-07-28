@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_file
-from ocean_model import run_simulation
+from ocean_model_simple import run_simulation
 import os
 
 app = Flask(__name__)
