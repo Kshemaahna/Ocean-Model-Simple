@@ -1,0 +1,103 @@
+import numpy as np
+import xarray as xr
+import matplotlib.pyplot as plt
+import os
+
+def run_simulation(nc_path=None):
+    g = 9.81
+    f0 = 1e-4
+    beta = 2e-11
+    Cd = 0.003
+    rho_air = 1.225
+    rho_water = 1025
+    wind_speed = 10
+    wind_stress = 0.0013 * rho_air * wind_speed**2
+
+    dt = 10.0
+    nt = 300  # time step value selected to ensure speed
+    nx, ny = 200, 200
+    lat0, lat1 = 30, 35
+    lon0, lon1 = -130, -125
+
+    if nc_path and os.path.exists(nc_path):
+        ds = xr.open_dataset(nc_path, engine="scipy")
+        sub = ds['elevation'].sel(lat=slice(lat0,lat1), lon=slice(lon0,lon1))
+        b = sub.values.astype(np.float64)
+        lat = sub['lat'].values
+        lon = sub['lon'].values
+    else:
+        lat = np.linspace(lat0, lat1, ny)
+        lon = np.linspace(lon0, lon1, nx)
+        b = -1000 + 200 * np.sin(np.linspace(0, 2*np.pi, nx))[:, None] * np.cos(np.linspace(0, 2*np.pi, ny))[None, :]
+
+    dx = dy = 111e3 * (lat[1] - lat[0])
+    Y = (lat - np.mean(lat)) * 111e3
+    f = f0 + beta * Y[:, None]
+
+    h = np.maximum(1.0, -b)
+    uh = np.zeros_like(h)
+    vh = np.zeros_like(h)
+    h[nx//2, ny//2] += 1.0
+
+    def radiation_bc(field):
+        field[0, :] = field[1, :]
+        field[-1, :] = field[-2, :]
+        field[:, 0] = field[:, 1]
+        field[:, -1] = field[:, -2]
+
+    def d_dx(arr):
+        return (np.roll(arr, -1, axis=0) - np.roll(arr, 1, axis=0)) / (2 * dx)
+
+    def d_dy(arr):
+        return (np.roll(arr, -1, axis=1) - np.roll(arr, 1, axis=1)) / (2 * dy)
+
+    for _ in range(nt):
+        u = uh / h
+        v = vh / h
+
+        Fx_h = uh
+        Fy_h = vh
+        Fx_u = u * uh + 0.5 * g * h**2
+        Fy_u = v * uh
+        Fx_v = u * vh
+        Fy_v = v * vh + 0.5 * g * h**2
+
+        uh_star = uh - dt * (d_dx(Fx_u) + d_dy(Fy_u))
+        vh_star = vh - dt * (d_dx(Fx_v) + d_dy(Fy_v))
+        h_star = h - dt * (d_dx(Fx_h) + d_dy(Fy_h))
+
+        dhb_dx = d_dx(b)
+        dhb_dy = d_dy(b)
+        u_star = uh_star / h_star
+        v_star = vh_star / h_star
+
+        tau_x = wind_stress * np.ones_like(h)
+        tau_y = 0.0
+
+        uh = uh_star + dt * (
+            h_star * (f * v_star) - g * h_star * dhb_dx
+            - Cd * u_star * np.sqrt(u_star**2 + v_star**2) * h_star
+            + tau_x / rho_water
+        )
+
+        vh = vh_star + dt * (
+            -h_star * (f * u_star) - g * h_star * dhb_dy
+            - Cd * v_star * np.sqrt(u_star**2 + v_star**2) * h_star
+            + tau_y / rho_water
+        )
+
+        h = h_star
+        radiation_bc(h)
+        radiation_bc(uh)
+        radiation_bc(vh)
+
+    eta = h + b
+    out_path = 'output.png'
+    plt.figure(figsize=(8, 5))
+    plt.imshow(eta.T, origin='lower', extent=[lon0, lon1, lat0, lat1], cmap='viridis')
+    plt.colorbar(label='Elevation (m)')
+    plt.title('Surface Elevation')
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+    return out_path
