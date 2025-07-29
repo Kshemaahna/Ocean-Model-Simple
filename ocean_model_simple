@@ -6,27 +6,6 @@ import subprocess
 import platform
 import imageio.v2 as imageio
 
-# --- Physical constants
-    g = 9.81
-    f0 = 1e-4
-    beta = 2e-11
-    rho_air = 1.225
-    rho0 = 1025.0
-    Cd = 0.001  # drag coefficient
-    wind_speed = 10
-    base_wind_stress = 0.0013 * rho_air * wind_speed**2
-    Ah = 20  # horizontal eddy viscosity (m^2/s)
-    Av = 0.5  # vertical eddy viscosity (m^2/s)
-
-# --- Grid
-    nx, ny, nz = 100, 100, 10
-    lat0, lat1 = 30, 35
-    lon0, lon1 = -130, -125
-    depth = 1000.0
-    dz = depth / nz
-    dt = 2.0  # time step (seconds)
-    nt = 200  # total time steps
-
 def open_file(path):
     system = platform.system()
     try:
@@ -39,21 +18,28 @@ def open_file(path):
     except Exception as e:
         print(f"Failed to open {path}: {e}")
 
- def d_dx(field):
-        return (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
-
- def d_dy(field):
-        return (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
-
-
-
- def laplacian(field, axis):
-        # Axis < 2 means horizontal directions use dx; axis==2 means vertical uses dz
-        delta = dx if axis < 2 else dz
-        return (np.roll(field, 1, axis) - 2 * field + np.roll(field, -1, axis)) / delta**2
-
 def run_3d_simulation(nc_path=None):
+    # --- Physical constants
+    g = 9.81
+    f0 = 1e-4
+    beta = 2e-11
+    rho_air = 1.225
+    rho0 = 1025.0
     rho_strat = np.linspace(rho0, rho0 + 2, 10)  # Stratified density (kg/m^3)
+    Cd = 0.001  # Reduced drag coefficient for more motion
+    wind_speed = 10
+    base_wind_stress = 0.0013 * rho_air * wind_speed**2
+    Ah = 20  # Reduced horizontal eddy viscosity (m^2/s)
+    Av = 0.5  # Reduced vertical eddy viscosity (m^2/s)
+
+    # --- Grid
+    nx, ny, nz = 100, 100, 10
+    lat0, lat1 = 30, 35
+    lon0, lon1 = -130, -125
+    depth = 1000.0
+    dz = depth / nz
+    dt = 2.0  # time step (seconds)
+    nt = 200  # total time steps
 
     lat = np.linspace(lat0, lat1, ny)
     lon = np.linspace(lon0, lon1, nx)
@@ -92,6 +78,17 @@ def run_3d_simulation(nc_path=None):
     np.random.seed(42)
     u += 1e-4 * np.random.randn(nx, ny, nz)
     v += 1e-4 * np.random.randn(nx, ny, nz)
+
+    def d_dx(field):
+        return (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
+
+    def d_dy(field):
+        return (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
+
+    def laplacian(field, axis):
+        # Axis < 2 means horizontal directions use dx; axis==2 means vertical uses dz
+        delta = dx if axis < 2 else dz
+        return (np.roll(field, 1, axis) - 2 * field + np.roll(field, -1, axis)) / delta**2
 
     quiver_frames = []
 
