@@ -6,6 +6,40 @@ import subprocess
 import platform
 import imageio.v2 as imageio
 
+#Physical constants
+g = 9.81
+f0 = 1e-4
+beta = 2e-11
+rho_air = 1.225
+rho0 = 1025.0
+rho_strat = np.linspace(rho0, rho0 + 2, 10)  # Stratified density (kg/m^3)
+Cd = 0.001  # Reduced drag coefficient for more motion
+wind_speed = 10
+base_wind_stress = 0.0013 * rho_air * wind_speed**2
+Ah = 20  # Reduced horizontal eddy viscosity (m^2/s)
+Av = 0.5  # Reduced vertical eddy viscosity (m^2/s)
+
+#Grid
+nx, ny, nz = 100, 100, 10
+lat0, lat1 = 30, 35
+lon0, lon1 = -130, -125
+depth = 1000.0
+dz = depth / nz
+dt = 2.0  # time step (seconds)
+nt = 200  # total time steps
+
+lat = np.linspace(lat0, lat1, ny)
+lon = np.linspace(lon0, lon1, nx)
+z = np.linspace(-dz/2, -depth + dz/2, nz)
+dx = dy = 111e3 * (lat[1] - lat[0])
+
+#paths of saved files
+netcdf_sim_path = "output_3d_simulation.nc"
+out_path = "output_3d_surface_currents.png"
+gif_path = "surface_currents.gif"
+
+
+#output helper functions
 def open_file(path):
     system = platform.system()
     try:
@@ -18,39 +52,27 @@ def open_file(path):
     except Exception as e:
         print(f"Failed to open {path}: {e}")
 
+
+#ocean sim math and misc helper functions
+def d_dx(field):
+    return (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
+
+def d_dy(field):
+    return (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
+
+def laplacian(field, axis):
+    # Axis < 2 means horizontal directions use dx; axis==2 means vertical uses dz
+    delta = dx if axis < 2 else dz
+    return (np.roll(field, 1, axis) - 2 * field + np.roll(field, -1, axis)) / delta**2
+
+
+#ocean sim
 def run_3d_simulation(nc_path=None):
-    # --- Physical constants
-    g = 9.81
-    f0 = 1e-4
-    beta = 2e-11
-    rho_air = 1.225
-    rho0 = 1025.0
-    rho_strat = np.linspace(rho0, rho0 + 2, 10)  # Stratified density (kg/m^3)
-    Cd = 0.001  # Reduced drag coefficient for more motion
-    wind_speed = 10
-    base_wind_stress = 0.0013 * rho_air * wind_speed**2
-    Ah = 20  # Reduced horizontal eddy viscosity (m^2/s)
-    Av = 0.5  # Reduced vertical eddy viscosity (m^2/s)
-
-    # --- Grid
-    nx, ny, nz = 100, 100, 10
-    lat0, lat1 = 30, 35
-    lon0, lon1 = -130, -125
-    depth = 1000.0
-    dz = depth / nz
-    dt = 2.0  # time step (seconds)
-    nt = 200  # total time steps
-
-    lat = np.linspace(lat0, lat1, ny)
-    lon = np.linspace(lon0, lon1, nx)
-    z = np.linspace(-dz/2, -depth + dz/2, nz)
-    dx = dy = 111e3 * (lat[1] - lat[0])
-
     Y = (lat - np.mean(lat)) * 111e3
     f_line = f0 + beta * Y
     f = np.tile(f_line[:, None], (1, nx)).T
 
-    # --- Bathymetry
+    #Bathymetry
     if nc_path and os.path.exists(nc_path):
         ds = xr.open_dataset(nc_path, engine="scipy")
         sub = ds['elevation'].sel(lat=slice(lat0, lat1), lon=slice(lon0, lon1))
@@ -62,33 +84,22 @@ def run_3d_simulation(nc_path=None):
     for k in range(nz):
         mask[:, :, k] = z[k] >= b
 
-    # --- Initialize fields
+    #Initialize fields
     u = np.zeros((nx, ny, nz))
     v = np.zeros((nx, ny, nz))
     w = np.zeros((nx, ny, nz))
     p = np.zeros((nx, ny, nz))
     rho = np.zeros((nx, ny, nz))
 
-    # Initialize stratified density and hydrostatic pressure
+    #Initialize stratified density and hydrostatic pressure
     for k in range(nz):
         rho[:, :, k] = rho_strat[k]
         p[:, :, k] = rho_strat[k] * g * (-z[k])
 
-    # Add small random perturbations to kickstart dynamics
+    #Add small random perturbations to kickstart dynamics
     np.random.seed(42)
     u += 1e-4 * np.random.randn(nx, ny, nz)
     v += 1e-4 * np.random.randn(nx, ny, nz)
-
-    def d_dx(field):
-        return (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
-
-    def d_dy(field):
-        return (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
-
-    def laplacian(field, axis):
-        # Axis < 2 means horizontal directions use dx; axis==2 means vertical uses dz
-        delta = dx if axis < 2 else dz
-        return (np.roll(field, 1, axis) - 2 * field + np.roll(field, -1, axis)) / delta**2
 
     quiver_frames = []
 
@@ -157,8 +168,7 @@ def run_3d_simulation(nc_path=None):
             quiver_frames.append(frame_path)
             plt.close()
 
-    # --- Save final plot
-    out_path = "output_3d_surface_currents.png"
+    #Save final plot
     plt.figure(figsize=(7, 5))
     plt.quiver(lon, lat, u[:, :, 0].T, v[:, :, 0].T, scale=10)
     plt.title("Final Surface Currents")
@@ -168,7 +178,7 @@ def run_3d_simulation(nc_path=None):
     plt.savefig(out_path)
     plt.close()
 
-    # --- Save NetCDF
+    #Save NetCDF
     ds_out = xr.Dataset(
         {
             'u': (['x', 'y', 'z'], u),
@@ -184,18 +194,17 @@ def run_3d_simulation(nc_path=None):
             'z': z,
         }
     )
-    ds_out.to_netcdf("output_3d_simulation.nc")
+    ds_out.to_netcdf(netcdf_sim_path)
 
-    # --- Create animation GIF
-    gif_path = "surface_currents.gif"
+    #Create animation GIF
     images = [imageio.imread(f) for f in quiver_frames]
     imageio.mimsave(gif_path, images, fps=3)
     for f in quiver_frames:
         os.remove(f)
 
-    # --- Open saved files automatically
+    #Open saved files automatically
     open_file(out_path)
-    open_file("output_3d_simulation.nc")
+    open_file(netcdf_sim_path)
     open_file(gif_path)
 
     return out_path, "output_3d_simulation.nc", gif_path
