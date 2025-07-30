@@ -5,55 +5,58 @@ import os
 import subprocess
 import platform
 import imageio.v2 as imageio
+from tqdm import trange
+import argparse
 
-#Physical constants
+# Physical constants
 g = 9.81
 f0 = 1e-4
 beta = 2e-11
 rho_air = 1.225
 rho0 = 1025.0
-rho_strat = np.linspace(rho0, rho0 + 2, 10)  # Stratified density (kg/m^3)
-Cd = 0.001  # Reduced drag coefficient for more motion
+rho_strat = np.linspace(rho0, rho0 + 2, 10)
+Cd = 0.001
 wind_speed = 10
 base_wind_stress = 0.0013 * rho_air * wind_speed**2
-Ah = 20  # Reduced horizontal eddy viscosity (m^2/s)
-Av = 0.5  # Reduced vertical eddy viscosity (m^2/s)
+Ah = 20
+Av = 0.5
 
-#Grid
+# Grid
 nx, ny, nz = 100, 100, 10
 lat0, lat1 = 30, 35
 lon0, lon1 = -130, -125
 depth = 1000.0
 dz = depth / nz
-dt = 2.0  # time step (seconds)
-nt = 200  # total time steps
+dt = 2.0
+nt = 200
 
 lat = np.linspace(lat0, lat1, ny)
 lon = np.linspace(lon0, lon1, nx)
 z = np.linspace(-dz/2, -depth + dz/2, nz)
 dx = dy = 111e3 * (lat[1] - lat[0])
 
-#paths of saved files
+# Output paths
 netcdf_sim_path = "output_3d_simulation.nc"
 out_path = "output_3d_surface_currents.png"
 gif_path = "surface_currents.gif"
+mp4_path = "surface_currents.mp4"
 
+# Utility
 
-#output helper functions
 def open_file(path):
     system = platform.system()
     try:
         if system == "Windows":
             os.startfile(path)
-        elif system == "Darwin":  # macOS
+        elif system == "Darwin":
             subprocess.run(["open", path])
-        else:  # Linux and others
+        else:
             subprocess.run(["xdg-open", path])
     except Exception as e:
         print(f"Failed to open {path}: {e}")
 
+# Derivatives
 
-#ocean sim math and misc helper functions
 def d_dx(field):
     return (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
 
@@ -61,18 +64,16 @@ def d_dy(field):
     return (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
 
 def laplacian(field, axis):
-    # Axis < 2 means horizontal directions use dx; axis==2 means vertical uses dz
     delta = dx if axis < 2 else dz
     return (np.roll(field, 1, axis) - 2 * field + np.roll(field, -1, axis)) / delta**2
 
+# Simulation core
 
-#ocean sim
-def run_3d_simulation(nc_path=None):
+def run_3d_simulation(nc_path=None, animate=True):
     Y = (lat - np.mean(lat)) * 111e3
     f_line = f0 + beta * Y
     f = np.tile(f_line[:, None], (1, nx)).T
 
-    #Bathymetry
     if nc_path and os.path.exists(nc_path):
         ds = xr.open_dataset(nc_path, engine="scipy")
         sub = ds['elevation'].sel(lat=slice(lat0, lat1), lon=slice(lon0, lon1))
@@ -84,30 +85,26 @@ def run_3d_simulation(nc_path=None):
     for k in range(nz):
         mask[:, :, k] = z[k] >= b
 
-    #Initialize fields
     u = np.zeros((nx, ny, nz))
     v = np.zeros((nx, ny, nz))
     w = np.zeros((nx, ny, nz))
     p = np.zeros((nx, ny, nz))
     rho = np.zeros((nx, ny, nz))
 
-    #Initialize stratified density and hydrostatic pressure
     for k in range(nz):
         rho[:, :, k] = rho_strat[k]
         p[:, :, k] = rho_strat[k] * g * (-z[k])
 
-    #Add small random perturbations to kickstart dynamics
     np.random.seed(42)
     u += 1e-4 * np.random.randn(nx, ny, nz)
     v += 1e-4 * np.random.randn(nx, ny, nz)
 
-    quiver_frames = []
+    gif_frames = []
+    mp4_writer = imageio.get_writer(mp4_path, fps=3) if animate else None
 
-    for t in range(nt):
-        # Time-varying wind stress (sinusoidal oscillation)
+    for t in trange(nt, desc="Simulating"):
         current_wind_stress = base_wind_stress * (1 + 0.5 * np.sin(2 * np.pi * t / nt))
 
-        # Update pressure field to approximate baroclinic adjustment (simple vertical integration)
         for k in range(nz - 2, -1, -1):
             p[:, :, k] = p[:, :, k + 1] + g * 0.5 * (rho[:, :, k] + rho[:, :, k + 1]) * dz
 
@@ -115,62 +112,74 @@ def run_3d_simulation(nc_path=None):
         dp_dy = d_dy(p)
 
         for k in range(nz):
-            speed = np.sqrt(u[:, :, k]**2 + v[:, :, k]**2) + 1e-10  # avoid division by zero
-            u[:, :, k] += dt * (
-                -dp_dx[:, :, k] / rho[:, :, k]
-                + f * v[:, :, k]
-                - Cd * u[:, :, k] * speed
-                + Ah * (laplacian(u[:, :, k], 0) + laplacian(u[:, :, k], 1))
-            )
-            v[:, :, k] += dt * (
-                -dp_dy[:, :, k] / rho[:, :, k]
-                - f * u[:, :, k]
-                - Cd * v[:, :, k] * speed
-                + Ah * (laplacian(v[:, :, k], 0) + laplacian(v[:, :, k], 1))
-            )
+            speed = np.sqrt(u[:, :, k]**2 + v[:, :, k]**2) + 1e-10
+            u[:, :, k] += dt * (-dp_dx[:, :, k]/rho[:, :, k] + f * v[:, :, k] - Cd * u[:, :, k] * speed + Ah * (laplacian(u[:, :, k], 0) + laplacian(u[:, :, k], 1)))
+            v[:, :, k] += dt * (-dp_dy[:, :, k]/rho[:, :, k] - f * u[:, :, k] - Cd * v[:, :, k] * speed + Ah * (laplacian(v[:, :, k], 0) + laplacian(v[:, :, k], 1)))
 
-        # Vertical diffusion
         for k in range(1, nz - 1):
-            u[:, :, k] += dt * Av * (u[:, :, k + 1] - 2 * u[:, :, k] + u[:, :, k - 1]) / dz**2
-            v[:, :, k] += dt * Av * (v[:, :, k + 1] - 2 * v[:, :, k] + v[:, :, k - 1]) / dz**2
+            u[:, :, k] += dt * Av * (u[:, :, k+1] - 2*u[:, :, k] + u[:, :, k-1]) / dz**2
+            v[:, :, k] += dt * Av * (v[:, :, k+1] - 2*v[:, :, k] + v[:, :, k-1]) / dz**2
 
-        # Apply time-varying wind stress at surface layer
         u[:, :, 0] += dt * (current_wind_stress / rho[:, :, 0] / dz)
 
-        # Boundary conditions (copy edge values for simplicity)
         for field in [u, v]:
             field[0, :, :] = field[1, :, :]
             field[-1, :, :] = field[-2, :, :]
             field[:, 0, :] = field[:, 1, :]
             field[:, -1, :] = field[:, -2, :]
 
-        # Mask below bathymetry
         u[~mask] = 0
         v[~mask] = 0
 
-        # Compute vertical velocity diagnostically from continuity
         div = d_dx(u) + d_dy(v)
         w[:, :, 0] = 0
         for k in range(1, nz):
             w[:, :, k] = w[:, :, k - 1] - dz * div[:, :, k - 1]
 
-        if t % 10 == 0:
-            print(f"Step {t}: max u={np.max(u):.6f}, max v={np.max(v):.6f}, wind stress={current_wind_stress:.6e}")
-
-            fig = plt.figure(figsize=(7, 5))
-            plt.quiver(lon, lat, u[:, :, 0].T, v[:, :, 0].T, scale=10)
+        if animate and t % 10 == 0:
+            speed_mag = np.sqrt(u[:, :, 0]**2 + v[:, :, 0]**2)
+            fig, ax = plt.subplots(figsize=(7, 5))
+            im = ax.pcolormesh(lon, lat, speed_mag.T, shading='auto', cmap='viridis')
+            ax.quiver(lon, lat, u[:, :, 0].T, v[:, :, 0].T, scale=10, color='white')
+            plt.colorbar(im, ax=ax, label='Speed (m/s)')
             plt.title(f"Surface Currents (t={t})")
             plt.xlabel("Longitude")
             plt.ylabel("Latitude")
             plt.tight_layout()
-            frame_path = f"_frame_{t:03d}.png"
-            plt.savefig(frame_path)
-            quiver_frames.append(frame_path)
+            plt.savefig("_temp_frame.png")
+            image = imageio.imread("_temp_frame.png")
+            gif_frames.append(image)
+            mp4_writer.append_data(image)
             plt.close()
 
-    #Save final plot
+    if animate:
+        imageio.mimsave(gif_path, gif_frames, fps=3)
+        mp4_writer.close()
+        os.remove("_temp_frame.png")
+
+    ds_out = xr.Dataset(
+        {
+            'u': (['lon', 'lat', 'z'], u),
+            'v': (['lon', 'lat', 'z'], v),
+            'w': (['lon', 'lat', 'z'], w),
+            'p': (['lon', 'lat', 'z'], p),
+            'rho': (['lon', 'lat', 'z'], rho),
+            'mask': (['lon', 'lat', 'z'], mask),
+        },
+        coords={
+            'lon': lon,
+            'lat': lat,
+            'z': z,
+        }
+    )
+    ds_out.to_netcdf(netcdf_sim_path)
+
+    # Final plot saved as PNG with colormap overlay
+    speed_mag = np.sqrt(u[:, :, 0]**2 + v[:, :, 0]**2)
     plt.figure(figsize=(7, 5))
-    plt.quiver(lon, lat, u[:, :, 0].T, v[:, :, 0].T, scale=10)
+    im = plt.pcolormesh(lon, lat, speed_mag.T, shading='auto', cmap='viridis')
+    plt.quiver(lon, lat, u[:, :, 0].T, v[:, :, 0].T, scale=10, color='white')
+    plt.colorbar(im, label='Speed (m/s)')
     plt.title("Final Surface Currents")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
@@ -178,38 +187,26 @@ def run_3d_simulation(nc_path=None):
     plt.savefig(out_path)
     plt.close()
 
-    #Save NetCDF
-    ds_out = xr.Dataset(
-        {
-            'u': (['x', 'y', 'z'], u),
-            'v': (['x', 'y', 'z'], v),
-            'w': (['x', 'y', 'z'], w),
-            'p': (['x', 'y', 'z'], p),
-            'rho': (['x', 'y', 'z'], rho),
-            'mask': (['x', 'y', 'z'], mask),
-        },
-        coords={
-            'x': lon,
-            'y': lat,
-            'z': z,
-        }
-    )
-    ds_out.to_netcdf(netcdf_sim_path)
-
-    #Create animation GIF
-    images = [imageio.imread(f) for f in quiver_frames]
-    imageio.mimsave(gif_path, images, fps=3)
-    for f in quiver_frames:
-        os.remove(f)
-
-    #Open saved files automatically
     open_file(out_path)
     open_file(netcdf_sim_path)
-    open_file(gif_path)
+    if animate:
+        open_file(gif_path)
+        open_file(mp4_path)
 
-    return out_path, "output_3d_simulation.nc", gif_path
+    return out_path, netcdf_sim_path, gif_path, mp4_path
 
+# Entry point
 
 if __name__ == "__main__":
-    image_file, nc_file, gif_file = run_3d_simulation()
-    print(f"Simulation complete.\nImage saved: {image_file}\nNetCDF saved: {nc_file}\nAnimation: {gif_file}")
+    parser = argparse.ArgumentParser(description="Run 3D ocean simulation.")
+    parser.add_argument("--bathymetry", type=str, default=None, help="Path to bathymetry NetCDF file")
+    parser.add_argument("--no-animation", action="store_true", help="Disable animation output")
+    args = parser.parse_args()
+
+    image_file, nc_file, gif_file, mp4_file = run_3d_simulation(
+        nc_path=args.bathymetry,
+        animate=not args.no_animation
+    )
+
+    print("Simulation complete.")
+    print(f"Image saved: {image_file}\nNetCDF saved: {nc_file}\nGIF: {gif_file}\nMP4: {mp4_file}")
