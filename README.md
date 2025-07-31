@@ -1,6 +1,6 @@
 #### Ocean Model (Simple Version 1.1)
 
-I am grateful to Dr. Mark R Petersen for his constant support, patience and guidance with the concepts as well as development of this model.
+I am grateful to Dr. Mark R Petersen, Lead Developer of the MPAS Model at the Los Alamos National Laboratory, for his constant support, patience and guidance with the concepts as well as development of this model.
 
 # 3D Hydrostatic Ocean Circulation Model
 
