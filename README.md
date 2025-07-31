@@ -1,5 +1,7 @@
 #### Ocean Model (Simple Version 1.1)
 
+I am grateful to Dr. Mark R Petersen for his constant support, patience and guidance with the concepts as well as development of this model.
+
 # 3D Hydrostatic Ocean Circulation Model
 
 This repository implements a three-dimensional, hydrostatic, barotropic ocean circulation model that simulates surface currents driven by wind stress, modulated by planetary rotation, and influenced by bathymetry. The model supports layered vertical discretization and can be run with synthetic or user-provided bathymetry files. Outputs include NetCDF datasets and animated visualizations of surface current evolution with time.
