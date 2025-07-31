@@ -4,7 +4,7 @@ I am grateful to Dr. Mark R Petersen, Lead Developer of the MPAS Model at the Lo
 
 # 3D Hydrostatic Ocean Circulation Model
 
-This repository implements a three-dimensional, hydrostatic, barotropic ocean circulation model that simulates surface currents driven by wind stress, modulated by planetary rotation, and influenced by bathymetry. The model supports layered vertical discretization and can be run with synthetic or user-provided bathymetry files. Outputs include NetCDF datasets and animated visualizations of surface current evolution with time.
+This repository implements a simple ocean model. This is a three-dimensional, hydrostatic, barotropic ocean circulation model that simulates surface currents driven by wind stress, modulated by planetary rotation, and influenced by bathymetry. The model supports layered vertical discretization and can be run with synthetic or user-provided bathymetry files. Outputs include NetCDF datasets and animated visualizations of surface current evolution with time.
 
 ---
 
