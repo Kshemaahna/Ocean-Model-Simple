@@ -25,7 +25,7 @@ pip install numpy xarray matplotlib imageio[ffmpeg] tqdm
 Run the simulation via:
 
 ```bash
-python ocean_model.py [--animate] [--gif] [--video] [--bathymetry PATH_TO_FILE]
+python ocean_model.py [--no-animation] [--bathymetry PATH_TO_FILE]
 ```
 
 ### Command-Line Arguments
