@@ -41,6 +41,8 @@ out_path = "output_3d_surface_currents.png" #visualizations
 gif_path = "surface_currents.gif"
 mp4_path = "surface_currents.mp4"
 
+avg_surface_speed = "avg_surface_speed.png"
+
 # Utility
 
 def open_file(path):
@@ -187,13 +189,26 @@ def run_3d_simulation(nc_path=None, animate=True):
     plt.savefig(out_path)
     plt.close()
 
+    speed_avg = np.sqrt(np.mean(u**2, axis=2) + np.mean(v**2, axis=2))
+    plt.figure(figsize=(7, 5))
+    im = plt.pcolormesh(lon, lat, speed_avg.T, shading='auto', cmap='plasma')
+    plt.colorbar(im, label='Depth-averaged speed (m/s)')
+    plt.title("Depth-Averaged Speed")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    plt.savefig(avg_surface_speed)
+    #plt.savefig()
+    plt.close()
+
     open_file(out_path)
     open_file(netcdf_sim_path)
+    open_file(avg_surface_speed)
     if animate:
         open_file(gif_path)
         open_file(mp4_path)
 
-    return out_path, netcdf_sim_path, gif_path, mp4_path
+    return out_path, netcdf_sim_path, avg_surface_speed, gif_path, mp4_path
 
 # Entry point
 
@@ -203,10 +218,10 @@ if __name__ == "__main__":
     parser.add_argument("--no-animation", action="store_true", help="Disable animation output")
     args = parser.parse_args()
 
-    image_file, nc_file, gif_file, mp4_file = run_3d_simulation(
+    image_file, nc_file, avg_speed_file, gif_file, mp4_file = run_3d_simulation(
         nc_path=args.bathymetry,
         animate=not args.no_animation
     )
 
     print("Simulation complete.")
-    print(f"Image saved: {image_file}\nNetCDF saved: {nc_file}\nGIF: {gif_file}\nMP4: {mp4_file}")
+    print(f"Images saved: {image_file} and {avg_speed_file}\nNetCDF saved: {nc_file}\nGIF: {gif_file}\nMP4: {mp4_file}")
