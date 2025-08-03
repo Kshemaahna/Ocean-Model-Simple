@@ -41,9 +41,13 @@ python ocean_model.py [--animate] [--gif] [--video] [--bathymetry PATH_TO_FILE]
 
 ## Output Files
 
+# Output data:
 - **`ocean_output.nc`**: NetCDF file containing the evolution of surface height `η`, and horizontal velocity components `u`, `v`
-- **`surface_currents.gif`**: Optional animation of surface currents (if `--gif` is used)
-- **`surface_currents.mp4`**: Optional video of surface currents (if `--video` is used)
+
+# Optional Visualizations of data:
+- **`surface_currents.gif`**: Animation of surface currents (if `--gif` is used)
+- **`surface_currents.mp4`**: Video of surface currents (if `--video` is used)
+- **`output_3d_surface_currents.png`**: Final surface currents (if `--animate` is used)
 
 ---
 ## Mathematical Model Description
