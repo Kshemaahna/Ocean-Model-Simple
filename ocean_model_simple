@@ -36,8 +36,8 @@ z = np.linspace(-dz/2, -depth + dz/2, nz)
 dx = dy = 111e3 * (lat[1] - lat[0])
 
 # Output paths
-netcdf_sim_path = "output_3d_simulation.nc"
-out_path = "output_3d_surface_currents.png"
+netcdf_sim_path = "output_3d_simulation.nc" #data
+out_path = "output_3d_surface_currents.png" #visualizations
 gif_path = "surface_currents.gif"
 mp4_path = "surface_currents.mp4"
 
