@@ -41,7 +41,7 @@ out_path = "output_3d_surface_currents.png" #visualizations
 gif_path = "surface_currents.gif"
 mp4_path = "surface_currents.mp4"
 
-avg_surface_speed = "avg_surface_speed.png"
+avg_speed = "avg_speed.png"
 
 # Utility
 
@@ -197,13 +197,12 @@ def run_3d_simulation(nc_path=None, animate=True):
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
     plt.tight_layout()
-    plt.savefig(avg_surface_speed)
-    #plt.savefig()
+    plt.savefig(avg_speed)
     plt.close()
 
     open_file(out_path)
     open_file(netcdf_sim_path)
-    open_file(avg_surface_speed)
+    open_file(avg_speed)
     if animate:
         open_file(gif_path)
         open_file(mp4_path)
