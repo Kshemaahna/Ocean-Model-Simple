@@ -207,7 +207,7 @@ def run_3d_simulation(nc_path=None, animate=True):
         open_file(gif_path)
         open_file(mp4_path)
 
-    return out_path, netcdf_sim_path, avg_surface_speed, gif_path, mp4_path
+    return out_path, netcdf_sim_path, avg_speed, gif_path, mp4_path
 
 # Entry point
 
