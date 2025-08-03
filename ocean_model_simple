@@ -209,7 +209,6 @@ def run_3d_simulation(nc_path=None, animate=True):
 
     return out_path, netcdf_sim_path, avg_speed, gif_path, mp4_path
 
-# Entry point
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run 3D ocean simulation.")
