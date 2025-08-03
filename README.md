@@ -43,7 +43,7 @@ python ocean_model.py [--animate] [--gif] [--video] [--bathymetry PATH_TO_FILE]
 - **`surface_currents.gif`**: Animation of surface currents
 - **`surface_currents.mp4`**: Video of surface currents
 - **`output_3d_surface_currents.png`**: Final surface currents
-- **`avg_surface_speed.png`**: Depth averaged speed 
+- **`avg_speed.png`**: Depth averaged speed 
 
 ---
 ## Mathematical Model Description
