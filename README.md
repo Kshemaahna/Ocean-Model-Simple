@@ -30,24 +30,20 @@ python ocean_model.py [--animate] [--gif] [--video] [--bathymetry PATH_TO_FILE]
 
 ### Command-Line Arguments
 
-| Argument        | Description                                                                 |
-|----------------|-----------------------------------------------------------------------------|
-| `--animate`     | Enables live animation while the model runs                                |
-| `--gif`         | Saves the animation as `surface_currents.gif`                              |
-| `--video`       | Saves the animation as `surface_currents.mp4` (requires `ffmpeg`)          |
-| `--bathymetry`  | Path to a NetCDF bathymetry file. If omitted, a synthetic Gaussian seamount is used |
+| Argument             | Description                                                                         |
+|----------------------|-------------------------------------------------------------------------------------|
+| `--no-animation`     | Disables animation while the model runs                                             |
+| `--bathymetry`       | Path to a NetCDF bathymetry file. If omitted, a synthetic Gaussian seamount is used |
 
 ---
 
-## Output Files
+## Output Files:
 
-# Output data:
 - **`ocean_output.nc`**: NetCDF file containing the evolution of surface height `η`, and horizontal velocity components `u`, `v`
-
-# Optional Visualizations of data:
-- **`surface_currents.gif`**: Animation of surface currents (if `--gif` is used)
-- **`surface_currents.mp4`**: Video of surface currents (if `--video` is used)
-- **`output_3d_surface_currents.png`**: Final surface currents (if `--animate` is used)
+- **`surface_currents.gif`**: Animation of surface currents
+- **`surface_currents.mp4`**: Video of surface currents
+- **`output_3d_surface_currents.png`**: Final surface currents
+- **`avg_surface_speed.png`**: Depth averaged speed 
 
 ---
 ## Mathematical Model Description
